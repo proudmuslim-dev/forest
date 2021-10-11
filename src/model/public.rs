@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
@@ -20,4 +24,43 @@ pub struct Ticker {
     bid: f64,
     #[serde_as(as = "DisplayFromStr")]
     ask: f64,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Trade {
+    date: usize,
+    // I could just name it r#type, but that's not a great approach
+    #[serde(rename = "type")]
+    #[serde_as(as = "DisplayFromStr")]
+    order_type: OrderType,
+    #[serde_as(as = "DisplayFromStr")]
+    price: f64,
+    #[serde_as(as = "DisplayFromStr")]
+    quantity: f64,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+enum OrderType {
+    Buy,
+    Sell,
+}
+
+impl FromStr for OrderType {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "buy" => Ok(Self::Buy),
+            "sell" => Ok(Self::Sell),
+            _ => Err("This can't fail unless the API is having an aneurysm"),
+        }
+    }
+}
+
+impl Display for OrderType {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
+        unimplemented!("Doesn't need to be implemented properly for our use case.")
+    }
 }
