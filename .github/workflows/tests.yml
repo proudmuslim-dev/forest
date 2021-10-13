@@ -33,4 +33,4 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests
-        run: cargo test --color=always --package forest --lib tests::public --no-fail-fast -- --format=json -Z unstable-options --show-output
+        run:  cargo test --color=always --package forest --lib tests --no-fail-fast -- --format=json -Z unstable-options --show-output
