@@ -1,6 +1,7 @@
 use crate::model::util::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use std::collections::HashMap;
 
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,4 +58,14 @@ pub struct Trade {
     price: f64,
     #[serde_as(as = "DisplayFromStr")]
     quantity: f64,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Orders {
+    success: bool,
+    #[serde_as(as = "HashMap<_, DisplayFromStr>")]
+    pub(crate) buy: HashMap<String, f64>,
+    #[serde_as(as = "HashMap<_, DisplayFromStr>")]
+    pub(crate) sell: HashMap<String, f64>,
 }
