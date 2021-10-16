@@ -11,18 +11,7 @@ mod tests {
 
         #[test]
         fn ticker() {
-            let j = r#"
-                {
-                    "success": true,
-                    "initialprice": "0.02502002",
-                    "price": "0.02500000",
-                    "high": "0.03102001",
-                    "low": "0.02500000",
-                    "volume": "0.15549958",
-                    "bid": "0.02420000",
-                    "ask": "0.02625000"
-                }
-            "#;
+            let j = r#"{"success":true,"initialprice":"0.02502002","price":"0.02500000","high":"0.03102001","low":"0.02500000","volume":"0.15549958","bid":"0.02420000","ask":"0.02625000"}"#;
 
             let _ticker: Ticker = serde_json::from_str(j).unwrap();
         }
@@ -71,12 +60,39 @@ mod tests {
         }
 
         #[test]
+        fn get_order() {
+            let j = r#"
+            {"success":true,"date":"1526503486","type":"sell","market":"BTC-XMR","price":"0.02891990","quantity":"1.00000000","fulfilled":"0.00000000"}
+            "#;
+
+            let _order: Order = serde_json::from_str(j).unwrap();
+        }
+
+        #[test]
         fn order_history() {
             let j = r#"
             [{"uuid":"a40ac710-8dc5-b5a8-aa69-389715197b14","date":1514876938,"type":"sell","price":"0.02621960","quantity":"1.55772526","market":"BTC-XMR"},{"uuid":"7cbbdbf9-a3a8-d106-c53a-2b17e535580d","date":1514856437,"type":"sell","price":"0.02590469","quantity":"1.54412193","market":"BTC-XMR"},{"uuid":"f2a156c6-b085-c272-3132-657585ab19cf","date":1514847818,"type":"buy","price":"0.02226940","quantity":"4.47924057","market":"BTC-XMR"},{"uuid":"1c137c7e-2653-639a-531e-10a227cda052","date":1514845801,"type":"sell","price":"0.02514424","quantity":"0.04565047","market":"BTC-XMR"},{"uuid":"0f62c05e-7293-fa1c-f13f-7ca54272db00","date":1514831165,"type":"sell","price":"0.02614656","quantity":"0.11642460","market":"BTC-XMR"},{"uuid":"82a254c4-2408-8962-13cb-c4fa6eff0536","date":1514503221,"type":"sell","price":"0.02489833","quantity":"0.40163143","market":"BTC-XMR"},{"uuid":"0e2211e3-4f59-cd7c-2825-a56ddb49288e","date":1514428646,"type":"buy","price":"0.02348630","quantity":"0.24549267","market":"BTC-XMR"},{"uuid":"d9fb4ecd-b565-89d6-4313-7d265d131dce","date":1514426549,"type":"buy","price":"0.02293571","quantity":"271.49500000","market":"BTC-XMR"},{"uuid":"57a9b092-38cc-e1da-64fe-9978d097226b","date":1514426168,"type":"buy","price":"0.02028922","quantity":"0.09857452","market":"BTC-XMR"},{"uuid":"301f7892-5da5-9338-1a6d-bb4523e84acc","date":1514419953,"type":"sell","price":"0.02585061","quantity":"0.07579787","market":"BTC-XMR"},{"uuid":"f04e2526-2dfc-f551-2fe1-f494f0b05a6d","date":1514419230,"type":"sell","price":"0.02466752","quantity":"18.33794037","market":"BTC-XMR"},{"uuid":"664c3b32-8373-ff6f-de21-c39cf69836d3","date":1514417522,"type":"sell","price":"0.02585998","quantity":"3.69720197","market":"BTC-XMR"},{"uuid":"4e29ae46-ee04-1842-2731-9d1ceaf2617a","date":1514415373,"type":"sell","price":"0.02568255","quantity":"0.37899005","market":"BTC-XMR"},{"uuid":"18ca887c-1275-fd0f-f0ff-c740f2372c08","date":1514408908,"type":"sell","price":"0.02570058","quantity":"0.12440815","market":"BTC-XMR"}]
             "#;
 
             let _order_history: Vec<OrderHistory<'_>> = serde_json::from_str(j).unwrap();
+        }
+
+        #[test]
+        fn balance() {
+            let j = r#"
+            {"success":true,"balance":"0.10000000","available":"0.00000000"}
+            "#;
+
+            let _balance: Balance = serde_json::from_str(j).unwrap();
+        }
+
+        #[test]
+        fn balances() {
+            let j = r#"
+            {"success":true,"balances":{"BTC":"13.00419483","XMR":"396.93688709","LTC":"2.00000000","SUMO":"1.00000000","ETN":"0.10000000","AEON":"0.00000000","XVG":"1.00000000","BCN":"2.20000000","FBF":"1.00000000","XAO":"2.00000000","ITNS":"20.00000000"}}
+            "#;
+
+            let _balances: Balances = serde_json::from_str(j).unwrap();
         }
     }
 }
