@@ -1,3 +1,6 @@
+use forest::ui::forest::*;
+use iced::{Sandbox, Settings};
+
 pub fn main() -> iced::Result {
-    todo!()
+    Forest::run(Settings::default())
 }
