@@ -2,8 +2,10 @@ use crate::ui::themes::{dark, light};
 use iced::{
     button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input,
 };
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Theme {
     Light,
     Dark,
@@ -18,6 +20,16 @@ impl Default for Theme {
         Theme::Dark
     }
 }
+
+impl Display for Theme {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Theme::Dark => write!(f, "dark"),
+            Theme::Light => write!(f, "light"),
+        }
+    }
+}
+
 impl From<Theme> for Box<dyn container::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {

@@ -1,4 +1,4 @@
-use crate::ui::themes::*;
+use crate::{config::ForestConfig, ui::themes::*};
 use iced::{
     button, text_input, Button, Column, Container, Element, HorizontalAlignment, Length, Radio,
     Row, Rule, Sandbox, Text, TextInput,
@@ -10,6 +10,7 @@ pub struct Forest {
     input: text_input::State,
     input_value: String,
     button: button::State,
+    config: ForestConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -23,7 +24,12 @@ impl Sandbox for Forest {
     type Message = Message;
 
     fn new() -> Self {
-        Self::default()
+        let cfg = ForestConfig::default();
+
+        Self {
+            theme: cfg.theme(),
+            ..Default::default()
+        }
     }
 
     fn title(&self) -> String {
@@ -34,8 +40,10 @@ impl Sandbox for Forest {
         match message {
             Message::ThemeChanged(theme) => self.theme = theme,
             Message::InputChanged(value) => self.input_value = value,
-            // TODO: Store API key to config file on click
-            Message::ButtonPressed => (),
+            Message::ButtonPressed => {
+                self.config.set_api_key(self.input_value.as_str());
+                self.config.set_theme(self.theme);
+            }
         }
     }
 
@@ -63,7 +71,8 @@ impl Sandbox for Forest {
         )
         .padding(10)
         .size(20)
-        .style(self.theme);
+        .style(self.theme)
+        .password();
 
         let button = Button::new(&mut self.button, Text::new("Next"))
             .padding(10)
