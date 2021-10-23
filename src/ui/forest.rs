@@ -6,7 +6,6 @@ use iced::{
 
 #[derive(Default)]
 pub struct Forest {
-    theme: style::Theme,
     input: text_input::State,
     input_value: String,
     button: button::State,
@@ -17,17 +16,19 @@ pub struct Forest {
 pub enum Message {
     ThemeChanged(style::Theme),
     InputChanged(String),
-    ButtonPressed,
+    ButtonPressed(ForestButton),
+}
+
+#[derive(Debug, Clone)]
+pub enum ForestButton {
+    Next,
 }
 
 impl Sandbox for Forest {
     type Message = Message;
 
     fn new() -> Self {
-        let cfg = ForestConfig::default();
-
         Self {
-            theme: cfg.theme(),
             ..Default::default()
         }
     }
@@ -38,11 +39,14 @@ impl Sandbox for Forest {
 
     fn update(&mut self, message: Self::Message) {
         match message {
-            Message::ThemeChanged(theme) => self.theme = theme,
+            Message::ThemeChanged(theme) => self.config.set_theme(theme),
             Message::InputChanged(value) => self.input_value = value,
-            Message::ButtonPressed => {
-                self.config.set_api_key(self.input_value.as_str());
-                self.config.set_theme(self.theme);
+            Message::ButtonPressed(button) => {
+                match button {
+                    ForestButton::Next => {
+                        self.config.set_api_key(self.input_value.as_str());
+                    }
+                }
             }
         }
     }
@@ -55,10 +59,10 @@ impl Sandbox for Forest {
                     Radio::new(
                         *theme,
                         &format!("{:?}", theme),
-                        Some(self.theme),
+                        Some(self.config.theme()),
                         Message::ThemeChanged,
                     )
-                    .style(self.theme),
+                    .style(self.config.theme()),
                 )
             },
         );
@@ -71,13 +75,13 @@ impl Sandbox for Forest {
         )
         .padding(10)
         .size(20)
-        .style(self.theme)
+        .style(self.config.theme())
         .password();
 
         let button = Button::new(&mut self.button, Text::new("Next"))
             .padding(10)
-            .on_press(Message::ButtonPressed)
-            .style(self.theme);
+            .on_press(Message::ButtonPressed(ForestButton::Next))
+            .style(self.config.theme());
 
         let content = Column::new()
             .spacing(20)
@@ -91,9 +95,9 @@ impl Sandbox for Forest {
                         .horizontal_alignment(HorizontalAlignment::Center),
                 ),
             )
-            .push(Rule::horizontal(38).style(self.theme))
+            .push(Rule::horizontal(38).style(self.config.theme()))
             .push(choose_theme)
-            .push(Rule::horizontal(38).style(self.theme))
+            .push(Rule::horizontal(38).style(self.config.theme()))
             .push(
                 Row::new()
                     .spacing(10)
@@ -106,7 +110,7 @@ impl Sandbox for Forest {
             .height(Length::Fill)
             .center_x()
             .center_y()
-            .style(self.theme)
+            .style(self.config.theme())
             .into()
     }
 }
