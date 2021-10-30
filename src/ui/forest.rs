@@ -2,6 +2,7 @@ use iced::{
     button, text_input, Align, Button, Column, Container, Element, HorizontalAlignment, Length,
     Radio, Row, Rule, Sandbox, Text, TextInput,
 };
+use iced_aw::{modal, Card, Modal};
 
 use crate::{config::ForestConfig, ui::themes::*};
 
@@ -12,6 +13,7 @@ pub struct Forest {
     back_button: button::State,
     input: text_input::State,
     input_value: String,
+    modal_state: modal::State<ModalState>,
     config: ForestConfig,
 }
 
@@ -31,19 +33,33 @@ impl Sandbox for Forest {
     fn update(&mut self, message: Self::Message) {
         match message {
             Message::ThemeChanged(theme) => self.config.set_theme(theme),
-            Message::InputChanged(value) => self.input_value = value,
+            Message::InputChanged(ref value) => self.input_value = value.clone(),
             Message::ButtonPressed(button) => match button {
                 ForestButton::Next => {
                     if !self.input_value.is_empty() && self.steps.current == 0 {
                         self.config.set_api_key(self.input_value.as_str());
                     }
 
-                    self.steps.forward();
+                    // Quick & dirty check
+                    if self.steps.steps[self.steps.current] == Step::Welcome
+                        && self.input_value.is_empty()
+                        && self.config.api_key().is_empty()
+                    {
+                        self.update(Message::OpenModal);
+                    } else {
+                        self.steps.forward();
+                    }
                 }
                 ForestButton::Back => {
                     self.steps.go_back();
                 }
             },
+            Message::OpenModal => {
+                self.modal_state.show(true);
+            }
+            Message::CloseModal => {
+                self.modal_state.show(false);
+            }
         }
     }
 
@@ -74,6 +90,7 @@ impl Forest {
             },
         );
 
+        // TODO: API key validation via RegEx
         let text_input = TextInput::new(
             &mut self.input,
             "Enter API key...",
@@ -95,10 +112,10 @@ impl Forest {
             .padding(20)
             .max_width(600)
             .push(
-                Row::new().spacing(10).push(
+                Row::new().align_items(Align::Center).spacing(10).push(
                     Text::new("Welcome to Forest!")
                         .width(Length::Fill)
-                        .size(50)
+                        .size(40)
                         .horizontal_alignment(HorizontalAlignment::Center),
                 ),
             )
@@ -112,7 +129,32 @@ impl Forest {
             )
             .push(Row::new().spacing(10).push(text_input).push(next_button));
 
-        Container::new(content)
+        let theme = self.config.theme();
+
+        // TODO: Figure out why it's impossible to align this correctly
+        let modal = Modal::new(&mut self.modal_state, content, move |state| {
+            Card::new(Text::new("Please enter an API Key."), Text::new(""))
+                .foot(
+                    Row::new().spacing(10).padding(5).width(Length::Fill).push(
+                        Button::new(
+                            &mut state.ok_state,
+                            Text::new("Ok").horizontal_alignment(HorizontalAlignment::Center),
+                        )
+                        .width(Length::Fill)
+                        .style(theme)
+                        .on_press(Message::CloseModal),
+                    ),
+                )
+                .max_width(300)
+                .on_close(Message::CloseModal)
+                .style(theme)
+                .into()
+        })
+        .backdrop(Message::CloseModal)
+        .on_esc(Message::CloseModal)
+        .style(self.config.theme());
+
+        Container::new(modal)
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
@@ -130,21 +172,7 @@ impl Forest {
             .spacing(20)
             .padding(20)
             .max_width(600)
-            .push(
-                Row::new().spacing(10).push(
-                    Text::new("Under construction...")
-                        .width(Length::Fill)
-                        .size(50)
-                        .horizontal_alignment(HorizontalAlignment::Center),
-                ),
-            )
-            .push(
-                Row::new()
-                    .align_items(Align::Center)
-                    .spacing(10)
-                    .padding(10)
-                    .push(back_button),
-            );
+            .push(Row::new().spacing(10).padding(10).push(back_button));
 
         Container::new(content)
             .width(Length::Fill)
@@ -160,9 +188,16 @@ pub enum Message {
     ThemeChanged(style::Theme),
     InputChanged(String),
     ButtonPressed(ForestButton),
+    OpenModal,
+    CloseModal,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default)]
+struct ModalState {
+    ok_state: button::State,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum ForestButton {
     Next,
     Back,
@@ -207,6 +242,7 @@ impl Default for Steps {
     }
 }
 
+#[derive(Eq, PartialEq)]
 pub enum Step {
     Welcome,
     Dashboard,

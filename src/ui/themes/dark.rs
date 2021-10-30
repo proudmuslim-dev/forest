@@ -1,36 +1,36 @@
-use iced::container::Style;
 use iced::{
-    button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input, Color,
+    button, checkbox, container, container::Style, progress_bar, radio, rule, scrollable, slider,
+    text_input, Background, Color,
 };
+use iced_aw::{card, modal};
+
+const BACKGROUND: Color =
+    Color::from_rgb(0xA as f32 / 255.0, 0xE as f32 / 255.0, 0x14 as f32 / 255.0);
 
 const SURFACE: Color = Color::from_rgb(
-    0x40 as f32 / 255.0,
-    0x44 as f32 / 255.0,
-    0x4B as f32 / 255.0,
+    0x1A as f32 / 255.0,
+    0x1B as f32 / 255.0,
+    0x1E as f32 / 255.0,
 );
 
 const ACCENT: Color = Color::from_rgb(
-    0x6F as f32 / 255.0,
     0xFF as f32 / 255.0,
-    0xE9 as f32 / 255.0,
+    0xA8 as f32 / 255.0,
+    0x6A as f32 / 255.0,
 );
 
 const ACTIVE: Color = Color::from_rgb(
-    0x72 as f32 / 255.0,
-    0x89 as f32 / 255.0,
-    0xDA as f32 / 255.0,
+    0xFF as f32 / 255.0,
+    0xB9 as f32 / 255.0,
+    0x88 as f32 / 255.0,
 );
 
-const HOVERED: Color = Color::from_rgb(
-    0x67 as f32 / 255.0,
-    0x7B as f32 / 255.0,
-    0xC4 as f32 / 255.0,
-);
+const HOVERED: Color = Color { a: 0.3, ..ACCENT };
 
 const TEXT: Color = Color::from_rgb(
-    0xED as f32 / 255.0,
-    0xF0 as f32 / 255.0,
-    0xF8 as f32 / 255.0,
+    0xFF as f32 / 255.0,
+    0xFF as f32 / 255.0,
+    0xFF as f32 / 255.0,
 );
 
 pub struct Container;
@@ -38,7 +38,7 @@ pub struct Container;
 impl container::StyleSheet for Container {
     fn style(&self) -> Style {
         container::Style {
-            background: Color::from_rgb8(0x36, 0x39, 0x3F).into(),
+            background: BACKGROUND.into(),
             text_color: TEXT.into(),
             ..container::Style::default()
         }
@@ -86,7 +86,7 @@ impl text_input::StyleSheet for TextInput {
     }
 
     fn placeholder_color(&self) -> Color {
-        Color::from_rgb(0.4, 0.4, 0.4)
+        Color::from_rgb(0.5, 0.5, 0.5)
     }
 
     fn value_color(&self) -> Color {
@@ -113,7 +113,7 @@ impl button::StyleSheet for Button {
         button::Style {
             background: ACTIVE.into(),
             border_radius: 3.0,
-            text_color: TEXT,
+            text_color: Color::BLACK,
             ..button::Style::default()
         }
     }
@@ -121,7 +121,6 @@ impl button::StyleSheet for Button {
     fn hovered(&self) -> button::Style {
         button::Style {
             background: HOVERED.into(),
-            text_color: TEXT,
             ..self.active()
         }
     }
@@ -131,6 +130,35 @@ impl button::StyleSheet for Button {
             border_width: 1.0,
             border_color: TEXT,
             ..self.hovered()
+        }
+    }
+}
+
+pub struct Card;
+
+impl card::StyleSheet for Card {
+    fn active(&self) -> card::Style {
+        card::Style {
+            background: Background::Color(BACKGROUND),
+            head_background: Background::Color(BACKGROUND),
+            body_background: Background::Color(BACKGROUND),
+            foot_background: Background::Color(BACKGROUND),
+            head_text_color: TEXT,
+            body_text_color: TEXT,
+            foot_text_color: TEXT,
+            border_color: BACKGROUND,
+            close_color: BACKGROUND,
+            ..Default::default()
+        }
+    }
+}
+
+pub struct Modal;
+
+impl modal::StyleSheet for Modal {
+    fn active(&self) -> modal::Style {
+        modal::Style {
+            background: Background::Color(BACKGROUND),
         }
     }
 }

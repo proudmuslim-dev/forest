@@ -2,6 +2,7 @@ use crate::ui::themes::{dark, light};
 use iced::{
     button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input,
 };
+use iced_aw::{card, modal};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -26,6 +27,24 @@ impl Display for Theme {
         match self {
             Theme::Dark => write!(f, "dark"),
             Theme::Light => write!(f, "light"),
+        }
+    }
+}
+
+impl From<Theme> for Box<dyn card::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        match theme {
+            Theme::Light => Default::default(),
+            Theme::Dark => dark::Card.into(),
+        }
+    }
+}
+
+impl From<Theme> for Box<dyn modal::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        match theme {
+            Theme::Light => Default::default(),
+            Theme::Dark => dark::Modal.into(),
         }
     }
 }
