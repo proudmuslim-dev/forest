@@ -33,7 +33,7 @@ impl Sandbox for Forest {
     fn update(&mut self, message: Self::Message) {
         match message {
             Message::ThemeChanged(theme) => self.config.set_theme(theme),
-            Message::InputChanged(ref value) => self.input_value = value.clone(),
+            Message::InputChanged(value) => self.input_value = value,
             Message::ButtonPressed(button) => match button {
                 ForestButton::Next => {
                     if !self.input_value.is_empty() && self.steps.current == 0 {
@@ -97,9 +97,10 @@ impl Forest {
             &self.input_value,
             Message::InputChanged,
         )
-        .padding(10)
         .size(20)
+        .padding(10)
         .style(self.config.theme())
+        .on_submit(Message::ButtonPressed(ForestButton::Next))
         .password();
 
         let next_button = Button::new(&mut self.next_button, Text::new("Next"))
