@@ -1,6 +1,6 @@
 use iced::{
-    button, text_input, Align, Button, Column, Container, Element, HorizontalAlignment, Length,
-    Radio, Row, Rule, Sandbox, Text, TextInput,
+    button, executor, text_input, Align, Application, Button, Clipboard, Column, Command,
+    Container, Element, HorizontalAlignment, Length, Radio, Row, Rule, Text, TextInput,
 };
 use iced_aw::{modal, Card, Modal};
 
@@ -8,44 +8,46 @@ use crate::{config::ForestConfig, ui::themes::*};
 
 #[derive(Default)]
 pub struct Forest {
-    steps: Steps,
-    next_button: button::State,
-    back_button: button::State,
-    input: text_input::State,
-    input_value: String,
-    modal_state: modal::State<ModalState>,
     config: ForestConfig,
+    steps: Steps,
+    state: State,
 }
 
-impl Sandbox for Forest {
+impl Application for Forest {
+    type Executor = executor::Default;
     type Message = Message;
+    type Flags = ();
 
-    fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
+    fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
+        (
+            Self {
+                ..Default::default()
+            },
+            Command::none(),
+        )
     }
 
     fn title(&self) -> String {
         "Forest".to_owned()
     }
 
-    fn update(&mut self, message: Self::Message) {
+    // TODO: Migrate update logic to `State` struct
+    fn update(&mut self, message: Self::Message, _clipboard: &mut Clipboard) -> Command<Message> {
         match message {
             Message::ThemeChanged(theme) => self.config.set_theme(theme),
-            Message::InputChanged(value) => self.input_value = value,
+            Message::InputChanged(value) => self.state.input_value = value,
             Message::ButtonPressed(button) => match button {
                 ForestButton::Next => {
-                    if !self.input_value.is_empty() && self.steps.current == 0 {
-                        self.config.set_api_key(self.input_value.as_str());
+                    if !self.state.input_value.is_empty() && self.steps.current == 0 {
+                        self.config.set_api_key(self.state.input_value.as_str());
                     }
 
                     // Quick & dirty check
                     if self.steps.steps[self.steps.current] == Step::Welcome
-                        && self.input_value.is_empty()
+                        && self.state.input_value.is_empty()
                         && self.config.api_key().is_empty()
                     {
-                        self.update(Message::OpenModal);
+                        self.state.modal_state.show(true);
                     } else {
                         self.steps.forward();
                     }
@@ -55,12 +57,14 @@ impl Sandbox for Forest {
                 }
             },
             Message::OpenModal => {
-                self.modal_state.show(true);
+                self.state.modal_state.show(true);
             }
             Message::CloseModal => {
-                self.modal_state.show(false);
+                self.state.modal_state.show(false);
             }
         }
+
+        Command::none()
     }
 
     fn view(&mut self) -> Element<Message> {
@@ -92,9 +96,9 @@ impl Forest {
 
         // TODO: API key validation via RegEx
         let text_input = TextInput::new(
-            &mut self.input,
+            &mut self.state.input,
             "Enter API key...",
-            &self.input_value,
+            &self.state.input_value,
             Message::InputChanged,
         )
         .size(20)
@@ -103,7 +107,7 @@ impl Forest {
         .on_submit(Message::ButtonPressed(ForestButton::Next))
         .password();
 
-        let next_button = Button::new(&mut self.next_button, Text::new("Next"))
+        let next_button = Button::new(&mut self.state.next_button, Text::new("Next"))
             .padding(10)
             .on_press(Message::ButtonPressed(ForestButton::Next))
             .style(self.config.theme());
@@ -133,7 +137,7 @@ impl Forest {
         let theme = self.config.theme();
 
         // TODO: Figure out why it's impossible to align this correctly
-        let modal = Modal::new(&mut self.modal_state, content, move |state| {
+        let modal = Modal::new(&mut self.state.modal_state, content, move |state| {
             Card::new(Text::new("Please enter an API Key."), Text::new(""))
                 .foot(
                     Row::new().spacing(10).padding(5).width(Length::Fill).push(
@@ -164,7 +168,7 @@ impl Forest {
     }
 
     fn dashboard(&mut self) -> Container<Message> {
-        let back_button = Button::new(&mut self.back_button, Text::new("Back"))
+        let back_button = Button::new(&mut self.state.back_button, Text::new("Back"))
             .padding(10)
             .on_press(Message::ButtonPressed(ForestButton::Back))
             .style(self.config.theme());
@@ -182,6 +186,15 @@ impl Forest {
             .center_y()
             .style(self.config.theme())
     }
+}
+
+#[derive(Default)]
+pub struct State {
+    modal_state: modal::State<ModalState>,
+    next_button: button::State,
+    back_button: button::State,
+    input: text_input::State,
+    input_value: String,
 }
 
 #[derive(Debug, Clone)]
