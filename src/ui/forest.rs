@@ -6,11 +6,15 @@ use iced_aw::{modal, Card, Modal};
 
 use crate::{config::ForestConfig, ui::themes::*};
 
-#[derive(Default)]
-pub struct Forest {
-    config: ForestConfig,
-    steps: Steps,
-    state: State,
+pub enum Forest {
+    LoggingIn {
+        config: ForestConfig,
+        state: LoginState,
+    },
+    Dashboard {
+        config: ForestConfig,
+        state: DashboardState,
+    },
 }
 
 impl Application for Forest {
@@ -18,59 +22,79 @@ impl Application for Forest {
     type Message = Message;
     type Flags = ();
 
-    fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
+    fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>) {
         (
-            Self {
-                ..Default::default()
+            Forest::LoggingIn {
+                config: ForestConfig::default(),
+                state: LoginState::default(),
             },
             Command::none(),
         )
     }
 
     fn title(&self) -> String {
-        "Forest".to_owned()
+        let subtitle = match self {
+            Forest::LoggingIn { .. } => "Login",
+            Forest::Dashboard { .. } => "Dashboard",
+        };
+
+        format!("Forest - {}", subtitle)
     }
 
-    // TODO: Migrate update logic to `State` struct
-    fn update(&mut self, message: Self::Message, _clipboard: &mut Clipboard) -> Command<Message> {
+    fn update(
+        &mut self,
+        message: Self::Message,
+        _clipboard: &mut Clipboard,
+    ) -> Command<Self::Message> {
         match message {
-            Message::ThemeChanged(theme) => self.config.set_theme(theme),
-            Message::InputChanged(value) => self.state.input_value = value,
+            Message::ThemeChanged(theme) => match self {
+                Forest::LoggingIn { config, .. } | Forest::Dashboard { config, .. } => {
+                    config.set_theme(theme);
+                }
+            },
+            Message::InputChanged(value) => {
+                if let Forest::LoggingIn { state, .. } = self {
+                    state.input_value = value;
+                }
+            }
             Message::ButtonPressed(button) => match button {
                 ForestButton::Next => {
-                    if !self.state.input_value.is_empty() && self.steps.current == 0 {
-                        self.config.set_api_key(self.state.input_value.as_str());
-                    }
-
-                    // Quick & dirty check
-                    if self.steps.steps[self.steps.current] == Step::Welcome
-                        && self.state.input_value.is_empty()
-                        && self.config.api_key().is_empty()
-                    {
-                        self.state.modal_state.show(true);
-                    } else {
-                        self.steps.forward();
+                    if let Forest::LoggingIn { config, state } = self {
+                        config.set_api_key(state.input_value.as_str());
+                        *self = Forest::Dashboard {
+                            config: ForestConfig::default(),
+                            state: DashboardState::default(),
+                        };
                     }
                 }
                 ForestButton::Back => {
-                    self.steps.go_back();
+                    if let Forest::Dashboard { .. } = self {
+                        *self = Forest::LoggingIn {
+                            state: LoginState::default(),
+                            config: ForestConfig::default(),
+                        };
+                    }
                 }
             },
-            Message::OpenModal => {
-                self.state.modal_state.show(true);
-            }
             Message::CloseModal => {
-                self.state.modal_state.show(false);
+                if let Forest::LoggingIn { state, .. } = self {
+                    state.modal_state.show(false);
+                }
+            }
+            Message::OpenModal => {
+                if let Forest::LoggingIn { state, .. } = self {
+                    state.modal_state.show(true);
+                }
             }
         }
 
         Command::none()
     }
 
-    fn view(&mut self) -> Element<Message> {
-        let content = match self.steps.steps[self.steps.current] {
-            Step::Welcome => self.welcome(),
-            Step::Dashboard => self.dashboard(),
+    fn view(&mut self) -> Element<'_, Self::Message> {
+        let content = match self {
+            Forest::LoggingIn { .. } => self.welcome(),
+            Forest::Dashboard { .. } => self.dashboard(),
         };
 
         content.into()
@@ -79,122 +103,134 @@ impl Application for Forest {
 
 impl Forest {
     fn welcome(&mut self) -> Container<Message> {
-        let choose_theme = style::Theme::ALL.iter().fold(
-            Column::new().spacing(10).push(Text::new("Choose a theme:")),
-            |column, theme| {
-                column.push(
-                    Radio::new(
-                        *theme,
-                        &format!("{:?}", theme),
-                        Some(self.config.theme()),
-                        Message::ThemeChanged,
-                    )
-                    .style(self.config.theme()),
-                )
-            },
-        );
-
-        // TODO: API key validation via RegEx
-        let text_input = TextInput::new(
-            &mut self.state.input,
-            "Enter API key...",
-            &self.state.input_value,
-            Message::InputChanged,
-        )
-        .size(20)
-        .padding(10)
-        .style(self.config.theme())
-        .on_submit(Message::ButtonPressed(ForestButton::Next))
-        .password();
-
-        let next_button = Button::new(&mut self.state.next_button, Text::new("Next"))
-            .padding(10)
-            .on_press(Message::ButtonPressed(ForestButton::Next))
-            .style(self.config.theme());
-
-        let content = Column::new()
-            .spacing(20)
-            .padding(20)
-            .max_width(600)
-            .push(
-                Row::new().align_items(Align::Center).spacing(10).push(
-                    Text::new("Welcome to Forest!")
-                        .width(Length::Fill)
-                        .size(40)
-                        .horizontal_alignment(HorizontalAlignment::Center),
-                ),
-            )
-            .push(Rule::horizontal(38).style(self.config.theme()))
-            .push(choose_theme)
-            .push(Rule::horizontal(38).style(self.config.theme()))
-            .push(
-                Row::new()
-                    .spacing(10)
-                    .push(Text::new("Enter your API key to continue:")),
-            )
-            .push(Row::new().spacing(10).push(text_input).push(next_button));
-
-        let theme = self.config.theme();
-
-        // TODO: Figure out why it's impossible to align this correctly
-        let modal = Modal::new(&mut self.state.modal_state, content, move |state| {
-            Card::new(Text::new("Please enter an API Key."), Text::new(""))
-                .foot(
-                    Row::new().spacing(10).padding(5).width(Length::Fill).push(
-                        Button::new(
-                            &mut state.ok_state,
-                            Text::new("Ok").horizontal_alignment(HorizontalAlignment::Center),
+        if let Forest::LoggingIn { state, config } = self {
+            let choose_theme = style::Theme::ALL.iter().fold(
+                Column::new().spacing(10).push(Text::new("Choose a theme:")),
+                |column, theme| {
+                    column.push(
+                        Radio::new(
+                            *theme,
+                            &format!("{:?}", theme),
+                            Some(config.theme()),
+                            Message::ThemeChanged,
                         )
-                        .width(Length::Fill)
-                        .style(theme)
-                        .on_press(Message::CloseModal),
+                        .style(config.theme()),
+                    )
+                },
+            );
+
+            // TODO: API key validation via RegEx
+            let text_input = TextInput::new(
+                &mut state.input,
+                "Enter API key...",
+                &state.input_value,
+                Message::InputChanged,
+            )
+            .size(20)
+            .padding(10)
+            .style(config.theme())
+            .on_submit(Message::ButtonPressed(ForestButton::Next))
+            .password();
+
+            let next_button = Button::new(&mut state.next_button, Text::new("Next"))
+                .padding(10)
+                .on_press(Message::ButtonPressed(ForestButton::Next))
+                .style(config.theme());
+
+            let content = Column::new()
+                .spacing(20)
+                .padding(20)
+                .max_width(600)
+                .push(
+                    Row::new().align_items(Align::Center).spacing(10).push(
+                        Text::new("Welcome to Forest!")
+                            .width(Length::Fill)
+                            .size(40)
+                            .horizontal_alignment(HorizontalAlignment::Center),
                     ),
                 )
-                .max_width(300)
-                .on_close(Message::CloseModal)
-                .style(theme)
-                .into()
-        })
-        .backdrop(Message::CloseModal)
-        .on_esc(Message::CloseModal)
-        .style(self.config.theme());
+                .push(Rule::horizontal(38).style(config.theme()))
+                .push(choose_theme)
+                .push(Rule::horizontal(38).style(config.theme()))
+                .push(
+                    Row::new()
+                        .spacing(10)
+                        .push(Text::new("Enter your API key to continue:")),
+                )
+                .push(Row::new().spacing(10).push(text_input).push(next_button));
 
-        Container::new(modal)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x()
-            .center_y()
-            .style(self.config.theme())
+            let theme = config.theme();
+
+            // TODO: Figure out why it's impossible to align this correctly
+            let modal = Modal::new(&mut state.modal_state, content, move |modal_state| {
+                Card::new(Text::new("Please enter an API Key."), Text::new(""))
+                    .foot(
+                        Row::new().spacing(10).padding(5).width(Length::Fill).push(
+                            Button::new(
+                                &mut modal_state.ok_state,
+                                Text::new("Ok").horizontal_alignment(HorizontalAlignment::Center),
+                            )
+                            .width(Length::Fill)
+                            .style(theme)
+                            .on_press(Message::CloseModal),
+                        ),
+                    )
+                    .max_width(300)
+                    .on_close(Message::CloseModal)
+                    .style(theme)
+                    .into()
+            })
+            .backdrop(Message::CloseModal)
+            .on_esc(Message::CloseModal)
+            .style(config.theme());
+
+            return Container::new(modal)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x()
+                .center_y()
+                .style(config.theme());
+        }
+
+        unimplemented!("This is unreachable")
     }
 
     fn dashboard(&mut self) -> Container<Message> {
-        let back_button = Button::new(&mut self.state.back_button, Text::new("Back"))
-            .padding(10)
-            .on_press(Message::ButtonPressed(ForestButton::Back))
-            .style(self.config.theme());
+        if let Forest::Dashboard { config, state } = self {
+            let back_button = Button::new(&mut state.back_button, Text::new("Back"))
+                .padding(10)
+                .on_press(Message::ButtonPressed(ForestButton::Back))
+                .style(config.theme());
 
-        let content = Column::new()
-            .spacing(20)
-            .padding(20)
-            .max_width(600)
-            .push(Row::new().spacing(10).padding(10).push(back_button));
+            let content = Column::new()
+                .spacing(20)
+                .padding(20)
+                .max_width(600)
+                .push(Row::new().spacing(10).padding(10).push(back_button));
 
-        Container::new(content)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x()
-            .center_y()
-            .style(self.config.theme())
+            return Container::new(content)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x()
+                .center_y()
+                .style(config.theme());
+        }
+
+        unimplemented!("This is unreachable")
     }
 }
 
 #[derive(Default)]
-pub struct State {
+pub struct LoginState {
     modal_state: modal::State<ModalState>,
     next_button: button::State,
-    back_button: button::State,
     input: text_input::State,
     input_value: String,
+}
+
+#[derive(Default)]
+pub struct DashboardState {
+    back_button: button::State,
 }
 
 #[derive(Debug, Clone)]
@@ -207,7 +243,7 @@ pub enum Message {
 }
 
 #[derive(Default)]
-struct ModalState {
+pub struct ModalState {
     ok_state: button::State,
 }
 
@@ -215,49 +251,4 @@ struct ModalState {
 pub enum ForestButton {
     Next,
     Back,
-}
-
-pub struct Steps {
-    steps: Vec<Step>,
-    current: usize,
-}
-
-impl Steps {
-    fn new() -> Steps {
-        Steps {
-            steps: vec![Step::Welcome, Step::Dashboard],
-            current: 0,
-        }
-    }
-    fn forward(&mut self) {
-        if self.can_continue() {
-            self.current += 1;
-        }
-    }
-
-    fn go_back(&mut self) {
-        if self.has_previous() {
-            self.current -= 1;
-        }
-    }
-
-    fn has_previous(&self) -> bool {
-        self.current > 0
-    }
-
-    fn can_continue(&self) -> bool {
-        self.current + 1 < self.steps.len()
-    }
-}
-
-impl Default for Steps {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Eq, PartialEq)]
-pub enum Step {
-    Welcome,
-    Dashboard,
 }
