@@ -7,7 +7,7 @@ use iced_aw::{modal, Card, Modal};
 use crate::{config::ForestConfig, ui::themes::*};
 
 pub enum Forest {
-    LoggingIn {
+    LoginScreen {
         config: ForestConfig,
         state: LoginState,
     },
@@ -24,7 +24,7 @@ impl Application for Forest {
 
     fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>) {
         (
-            Forest::LoggingIn {
+            Forest::LoginScreen {
                 config: ForestConfig::default(),
                 state: LoginState::default(),
             },
@@ -34,7 +34,7 @@ impl Application for Forest {
 
     fn title(&self) -> String {
         let subtitle = match self {
-            Forest::LoggingIn { .. } => "Login",
+            Forest::LoginScreen { .. } => "Login",
             Forest::Dashboard { .. } => "Dashboard",
         };
 
@@ -48,18 +48,18 @@ impl Application for Forest {
     ) -> Command<Self::Message> {
         match message {
             Message::ThemeChanged(theme) => match self {
-                Forest::LoggingIn { config, .. } | Forest::Dashboard { config, .. } => {
+                Forest::LoginScreen { config, .. } | Forest::Dashboard { config, .. } => {
                     config.set_theme(theme);
                 }
             },
             Message::InputChanged(value) => {
-                if let Forest::LoggingIn { state, .. } = self {
+                if let Forest::LoginScreen { state, .. } = self {
                     state.input_value = value;
                 }
             }
             Message::ButtonPressed(button) => match button {
                 ForestButton::Next => {
-                    if let Forest::LoggingIn { config, state } = self {
+                    if let Forest::LoginScreen { config, state } = self {
                         config.set_api_key(state.input_value.as_str());
                         *self = Forest::Dashboard {
                             config: ForestConfig::default(),
@@ -69,7 +69,7 @@ impl Application for Forest {
                 }
                 ForestButton::Back => {
                     if let Forest::Dashboard { .. } = self {
-                        *self = Forest::LoggingIn {
+                        *self = Forest::LoginScreen {
                             state: LoginState::default(),
                             config: ForestConfig::default(),
                         };
@@ -77,12 +77,12 @@ impl Application for Forest {
                 }
             },
             Message::CloseModal => {
-                if let Forest::LoggingIn { state, .. } = self {
+                if let Forest::LoginScreen { state, .. } = self {
                     state.modal_state.show(false);
                 }
             }
             Message::OpenModal => {
-                if let Forest::LoggingIn { state, .. } = self {
+                if let Forest::LoginScreen { state, .. } = self {
                     state.modal_state.show(true);
                 }
             }
@@ -93,7 +93,7 @@ impl Application for Forest {
 
     fn view(&mut self) -> Element<'_, Self::Message> {
         let content = match self {
-            Forest::LoggingIn { .. } => self.welcome(),
+            Forest::LoginScreen { .. } => self.welcome(),
             Forest::Dashboard { .. } => self.dashboard(),
         };
 
@@ -103,7 +103,7 @@ impl Application for Forest {
 
 impl Forest {
     fn welcome(&mut self) -> Container<Message> {
-        if let Forest::LoggingIn { state, config } = self {
+        if let Forest::LoginScreen { state, config } = self {
             let choose_theme = style::Theme::ALL.iter().fold(
                 Column::new().spacing(10).push(Text::new("Choose a theme:")),
                 |column, theme| {
