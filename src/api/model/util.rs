@@ -6,7 +6,7 @@ use std::{
 };
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum OrderType {
     Buy,
     Sell,

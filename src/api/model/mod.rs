@@ -1,3 +1,3 @@
 pub mod private;
 pub mod public;
-mod util;
+pub mod util;

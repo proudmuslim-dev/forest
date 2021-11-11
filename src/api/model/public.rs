@@ -1,4 +1,4 @@
-use crate::model::util::*;
+use crate::api::model::util::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::collections::HashMap;
@@ -26,7 +26,7 @@ pub struct Market {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Ticker {
     success: bool,
     #[serde(rename = "initialprice")]

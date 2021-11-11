@@ -1,20 +1,45 @@
 use iced::{
     button, executor, text_input, Align, Application, Button, Clipboard, Column, Command,
-    Container, Element, HorizontalAlignment, Length, Radio, Row, Rule, Text, TextInput,
+    Container, Element, Font, HorizontalAlignment, Length, Radio, Row, Rule, Svg, Text, TextInput,
 };
 use iced_aw::{modal, Card, Modal};
+use std::collections::HashMap;
 
-use crate::{config::ForestConfig, ui::themes::*};
+use crate::{
+    api::{
+        model::private::{Balances, OrderHistory},
+        requests::util::*,
+    },
+    config::ForestConfig,
+    ui::{themes::*, util},
+};
 
+// TODO: Clean up the absolute mess I created figuring this out
 pub enum Forest {
     LoginScreen {
         config: ForestConfig,
         state: LoginState,
     },
-    Dashboard {
+    DashboardLoading {
         config: ForestConfig,
-        state: DashboardState,
+        state: DashboardLoadingState,
     },
+    DashboardLoaded {
+        state: DashboardState,
+        config: ForestConfig,
+        balances: Balances,
+        orders: Vec<OrderHistory>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    LoadingComplete((Result<Balances, Error>, Result<Vec<OrderHistory>, Error>)),
+    ButtonPressed(ForestButton),
+    ThemeChanged(style::Theme),
+    InputChanged(String),
+    OpenModal,
+    CloseModal,
 }
 
 impl Application for Forest {
@@ -35,7 +60,7 @@ impl Application for Forest {
     fn title(&self) -> String {
         let subtitle = match self {
             Forest::LoginScreen { .. } => "Login",
-            Forest::Dashboard { .. } => "Dashboard",
+            Forest::DashboardLoading { .. } | Forest::DashboardLoaded { .. } => "Dashboard",
         };
 
         format!("Forest - {}", subtitle)
@@ -48,7 +73,9 @@ impl Application for Forest {
     ) -> Command<Self::Message> {
         match message {
             Message::ThemeChanged(theme) => match self {
-                Forest::LoginScreen { config, .. } | Forest::Dashboard { config, .. } => {
+                Forest::LoginScreen { config, .. }
+                | Forest::DashboardLoading { config, .. }
+                | Forest::DashboardLoaded { config, .. } => {
                     config.set_theme(theme);
                 }
             },
@@ -58,17 +85,33 @@ impl Application for Forest {
                 }
             }
             Message::ButtonPressed(button) => match button {
-                ForestButton::Next => {
-                    if let Forest::LoginScreen { config, state } = self {
-                        config.set_api_key(state.input_value.as_str());
-                        *self = Forest::Dashboard {
+                ForestButton::Next => match self {
+                    Forest::LoginScreen { config, state } => {
+                        if !state.input_value.is_empty() {
+                            config.set_api_key(state.input_value.as_str());
+                        }
+
+                        *self = Forest::DashboardLoading {
                             config: ForestConfig::default(),
-                            state: DashboardState::default(),
+                            state: DashboardLoadingState::default(),
                         };
+                        if let Forest::DashboardLoading { config, .. } = self {
+                            return Command::perform(
+                                util::load_dashboard(config.api_key()),
+                                Message::LoadingComplete,
+                            );
+                        }
                     }
-                }
+                    Forest::DashboardLoading { config, .. } => {
+                        return Command::perform(
+                            util::load_dashboard(config.api_key()),
+                            Message::LoadingComplete,
+                        )
+                    }
+                    _ => {}
+                },
                 ForestButton::Back => {
-                    if let Forest::Dashboard { .. } = self {
+                    if let Forest::DashboardLoading { .. } = self {
                         *self = Forest::LoginScreen {
                             state: LoginState::default(),
                             config: ForestConfig::default(),
@@ -76,6 +119,19 @@ impl Application for Forest {
                     }
                 }
             },
+            Message::LoadingComplete((balances, orders)) => {
+                // TODO: Use match statement on `orders` & `balances` for error screen
+                if let Forest::DashboardLoading { .. } = self {
+                    let balances = balances.unwrap();
+                    let orders = orders.unwrap();
+                    *self = Forest::DashboardLoaded {
+                        balances,
+                        orders,
+                        config: ForestConfig::default(),
+                        state: DashboardState::default(),
+                    }
+                }
+            }
             Message::CloseModal => {
                 if let Forest::LoginScreen { state, .. } = self {
                     state.modal_state.show(false);
@@ -94,7 +150,7 @@ impl Application for Forest {
     fn view(&mut self) -> Element<'_, Self::Message> {
         let content = match self {
             Forest::LoginScreen { .. } => self.welcome(),
-            Forest::Dashboard { .. } => self.dashboard(),
+            Forest::DashboardLoading { .. } | Forest::DashboardLoaded { .. } => self.dashboard(),
         };
 
         content.into()
@@ -192,32 +248,158 @@ impl Forest {
                 .style(config.theme());
         }
 
-        unimplemented!("This is unreachable")
+        unimplemented!("Unreachable")
     }
 
     fn dashboard(&mut self) -> Container<Message> {
-        if let Forest::Dashboard { config, state } = self {
-            let back_button = Button::new(&mut state.back_button, Text::new("Back"))
-                .padding(10)
-                .on_press(Message::ButtonPressed(ForestButton::Back))
-                .style(config.theme());
-
-            let content = Column::new()
-                .spacing(20)
-                .padding(20)
-                .max_width(600)
-                .push(Row::new().spacing(10).padding(10).push(back_button));
-
-            return Container::new(content)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .center_x()
-                .center_y()
-                .style(config.theme());
+        fn section_title(title: &str) -> Row<Message> {
+            Row::new().push(
+                Text::new(title)
+                    .width(Length::Fill)
+                    .size(40)
+                    .horizontal_alignment(HorizontalAlignment::Center),
+            )
         }
 
-        unimplemented!("This is unreachable")
+        match self {
+            Forest::DashboardLoading { config, state } => {
+                let back_button = Button::new(&mut state.back_button, Text::new("Back"))
+                    .padding(10)
+                    .on_press(Message::ButtonPressed(ForestButton::Back))
+                    .style(config.theme());
+
+                let next_button = Button::new(
+                    &mut state.force_next_button,
+                    Text::new("Taking too long? Retry"),
+                )
+                .padding(10)
+                .on_press(Message::ButtonPressed(ForestButton::Next))
+                .style(config.theme());
+
+                let content = Column::new()
+                    .spacing(20)
+                    .padding(20)
+                    .max_width(600)
+                    .push(section_title("Loading..."))
+                    .push(Rule::horizontal(38).style(config.theme()))
+                    .push(
+                        Row::new()
+                            .spacing(10)
+                            .padding(10)
+                            .push(back_button)
+                            .push(next_button),
+                    );
+
+                return Container::new(content)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x()
+                    .center_y()
+                    .style(config.theme());
+            }
+            Forest::DashboardLoaded {
+                config,
+                state,
+                balances,
+                orders,
+            } => {
+                const FIRA_CODE: Font = Font::External {
+                    name: "Fira Code",
+                    bytes: include_bytes!("../../assets/fonts/FiraCode-Regular.ttf"),
+                };
+
+                fn display_balance(
+                    currency: Currency,
+                    balances: &HashMap<String, f64>,
+                ) -> Row<Message> {
+                    fn get_icon_path(currency: &str) -> String {
+                        format!("assets/icons/{}.svg", currency)
+                    }
+
+                    let (icon_path, currency) = match currency {
+                        Currency::BTC => (get_icon_path("bitcoin"), "BTC"),
+                        Currency::XMR => (get_icon_path("monero"), "XMR"),
+                    };
+
+                    Row::new()
+                        .spacing(10)
+                        .push(
+                            Svg::from_path(icon_path)
+                                .width(Length::Units(28))
+                                .height(Length::Units(28)),
+                        )
+                        .push(
+                            Text::new(format!("{}: {}", currency, balances.get(currency).unwrap()))
+                                .horizontal_alignment(HorizontalAlignment::Left)
+                                .font(FIRA_CODE),
+                        )
+                }
+
+                fn display_orders(
+                    mut order_history: Vec<OrderHistory>,
+                ) -> Column<'static, Message> {
+                    fn display_order(order: OrderHistory) -> Row<'static, Message> {
+                        Row::new().spacing(10).push(Text::new(order.market))
+                    }
+
+                    let mut history = Column::new().spacing(10);
+
+                    if order_history.is_empty() {
+                        return history.push(Text::new("No active orders!"));
+                    }
+
+                    for _ in 0..order_history.len() {
+                        history = history.push(display_order(order_history.pop().unwrap()))
+                    }
+
+                    history
+                }
+
+                let back_button = Button::new(&mut state.back_button, Text::new("Back"))
+                    .padding(10)
+                    .on_press(Message::ButtonPressed(ForestButton::Back))
+                    .style(config.theme());
+
+                let balances = Column::new()
+                    .spacing(20)
+                    .padding(20)
+                    .max_width(300)
+                    .push(section_title("Balances"))
+                    .push(Rule::horizontal(38).style(config.theme()))
+                    .push(display_balance(Currency::BTC, balances.get_all()))
+                    .push(display_balance(Currency::XMR, balances.get_all()));
+
+                let active_orders = Column::new()
+                    .spacing(20)
+                    .padding(20)
+                    .max_width(300)
+                    .push(section_title("Orders"))
+                    .push(Rule::horizontal(38).style(config.theme()))
+                    .push(display_orders(orders.clone()));
+
+                let row_one = Row::new().push(balances).push(active_orders);
+
+                let content = Column::new()
+                    .push(row_one)
+                    .push(back_button)
+                    .align_items(Align::Center);
+
+                return Container::new(content)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x()
+                    .center_y()
+                    .style(config.theme());
+            }
+            _ => unimplemented!("Unreachable"),
+        }
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ForestButton {
+    Next,
+    Back,
 }
 
 #[derive(Default)]
@@ -229,26 +411,17 @@ pub struct LoginState {
 }
 
 #[derive(Default)]
-pub struct DashboardState {
-    back_button: button::State,
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    ThemeChanged(style::Theme),
-    InputChanged(String),
-    ButtonPressed(ForestButton),
-    OpenModal,
-    CloseModal,
-}
-
-#[derive(Default)]
 pub struct ModalState {
     ok_state: button::State,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum ForestButton {
-    Next,
-    Back,
+#[derive(Default)]
+pub struct DashboardLoadingState {
+    back_button: button::State,
+    force_next_button: button::State,
+}
+
+#[derive(Default)]
+pub struct DashboardState {
+    back_button: button::State,
 }

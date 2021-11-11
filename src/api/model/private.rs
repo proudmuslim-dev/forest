@@ -1,6 +1,7 @@
-use crate::model::util::OrderType;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+
+use crate::api::model::util::OrderType;
 use std::collections::HashMap;
 
 #[serde_as]
@@ -40,34 +41,44 @@ pub struct Cancel {
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Serialize)]
-pub struct OrderHistory<'v> {
-    uuid: &'v str,
-    date: usize,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OrderHistory {
+    uuid: String,
+    pub(crate) date: usize,
     #[serde(rename = "type")]
     #[serde_as(as = "DisplayFromStr")]
-    order_type: OrderType,
+    pub(crate) order_type: OrderType,
     #[serde_as(as = "DisplayFromStr")]
-    price: f64,
+    pub(crate) price: f64,
     #[serde_as(as = "DisplayFromStr")]
-    quantity: f64,
-    market: &'v str,
+    pub(crate) quantity: f64,
+    pub(crate) market: String,
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Balance {
     success: bool,
     #[serde_as(as = "DisplayFromStr")]
-    balance: f64,
+    pub balance: f64,
     #[serde_as(as = "DisplayFromStr")]
-    available: f64,
+    pub available: f64,
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Balances {
     success: bool,
     #[serde_as(as = "HashMap<_, DisplayFromStr>")]
-    pub(crate) balances: HashMap<String, f64>,
+    balances: HashMap<String, f64>,
+}
+
+impl Balances {
+    pub fn get(&self, key: &str) -> Option<&f64> {
+        self.balances.get(key)
+    }
+
+    pub fn get_all(&self) -> &HashMap<String, f64> {
+        &self.balances
+    }
 }
