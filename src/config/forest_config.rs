@@ -1,10 +1,12 @@
-use crate::ui::themes::style::Theme;
 use confy::ConfyError;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 
+use crate::{api::requests::util::Currency, ui::themes::style::Theme};
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ForestConfig {
+    pub(crate) markets: Vec<Currency>,
     api_key: String,
     theme: Theme,
 }
@@ -22,6 +24,11 @@ impl ForestConfig {
 
     pub fn theme(&self) -> Theme {
         self.theme
+    }
+
+    pub fn set_favorite_markets(&mut self, markets: Vec<Currency>) {
+        self.markets = markets;
+        confy::store("forest", self).unwrap();
     }
 
     pub fn set_api_key(&mut self, key: &str) {

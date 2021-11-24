@@ -1,7 +1,6 @@
-use crate::api::model::private::OrderHistory;
-use crate::{
-    api::model::private::{Balance, Balances},
-    api::requests::util::*,
+use crate::api::{
+    model::private::{Balance, Balances, OrderHistory},
+    requests::util::*,
 };
 
 pub struct PrivateAPI {}

@@ -1,6 +1,10 @@
 use crate::api::{
     model::private::{Balances, OrderHistory},
-    requests::{util::Error, PrivateAPI},
+    model::public::Ticker,
+    requests::{
+        util::{Currency, Error},
+        PrivateAPI, PublicAPI,
+    },
 };
 
 pub async fn load_dashboard(
@@ -10,4 +14,13 @@ pub async fn load_dashboard(
     let orders = PrivateAPI::orders(key).await;
 
     (balances, orders)
+}
+
+pub async fn tickers(markets: Vec<Currency>) -> Result<Vec<Ticker>, Error> {
+    let mut responses = vec![];
+    for currency in markets {
+        responses.push(PublicAPI::ticker(currency).await.unwrap());
+    }
+
+    Ok(responses)
 }

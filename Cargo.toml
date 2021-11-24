@@ -8,19 +8,20 @@ Custom frontend for the tradeogre.com exchange, written using Iced.
 edition = "2018"
 
 [dependencies]
+## UI
 iced_aw = { git = "https://github.com/iced-rs/iced_aw", branch = "main", default-features = false, features = ["card", "modal"] }
-linked-hash-map = { version = "0.5.4", features = ["serde_impl"] }
 iced = { version = "0.3.0", features = ["debug", "tokio", "svg"] }
+
+## Serialization/Deserialization
+serde_with = { version = "1.10.0", features = ["json", "macros"] }
 serde = { version = "1", features = ["derive"] }
-lazy_static = "1.4.0"
 serde_json = "1.0"
 confy = "0.4.0"
+
+## Misc
+linked-hash-map = { version = "0.5.4", features = ["serde_impl"] }
+reqwest = { version = "0.11.4", features = ["json"] }
+lazy_static = "1.4.0"
+strum_macros = "0.23"
+strum = "0.23.0"
 dirs = "3.0.2"
-
-[dependencies.reqwest]
-version = "0.11.4"
-features = ["json"]
-
-[dependencies.serde_with]
-version = "1.10.0"
-features = ["json", "macros"]

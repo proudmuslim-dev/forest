@@ -8,13 +8,13 @@ use std::collections::HashMap;
 use crate::{
     api::{
         model::private::{Balances, OrderHistory},
+        model::public::Ticker,
         requests::util::*,
     },
     config::ForestConfig,
     ui::{themes::*, util},
 };
 
-// TODO: Clean up the absolute mess I created figuring this out
 pub enum Forest {
     LoginScreen {
         config: ForestConfig,
@@ -24,10 +24,11 @@ pub enum Forest {
         config: ForestConfig,
         state: DashboardLoadingState,
     },
-    DashboardLoaded {
+    Dashboard {
         state: DashboardState,
         config: ForestConfig,
         balances: Balances,
+        tickers: Option<Vec<Ticker>>,
         orders: Vec<OrderHistory>,
     },
 }
@@ -35,6 +36,7 @@ pub enum Forest {
 #[derive(Debug, Clone)]
 pub enum Message {
     LoadingComplete((Result<Balances, Error>, Result<Vec<OrderHistory>, Error>)),
+    TickersReceived(Result<Vec<Ticker>, Error>),
     ButtonPressed(ForestButton),
     ThemeChanged(style::Theme),
     InputChanged(String),
@@ -60,7 +62,7 @@ impl Application for Forest {
     fn title(&self) -> String {
         let subtitle = match self {
             Forest::LoginScreen { .. } => "Login",
-            Forest::DashboardLoading { .. } | Forest::DashboardLoaded { .. } => "Dashboard",
+            Forest::DashboardLoading { .. } | Forest::Dashboard { .. } => "Dashboard",
         };
 
         format!("Forest - {}", subtitle)
@@ -75,7 +77,7 @@ impl Application for Forest {
             Message::ThemeChanged(theme) => match self {
                 Forest::LoginScreen { config, .. }
                 | Forest::DashboardLoading { config, .. }
-                | Forest::DashboardLoaded { config, .. } => {
+                | Forest::Dashboard { config, .. } => {
                     config.set_theme(theme);
                 }
             },
@@ -124,11 +126,36 @@ impl Application for Forest {
                 if let Forest::DashboardLoading { .. } = self {
                     let balances = balances.unwrap();
                     let orders = orders.unwrap();
-                    *self = Forest::DashboardLoaded {
+                    *self = Forest::Dashboard {
                         balances,
                         orders,
+                        tickers: None,
                         config: ForestConfig::default(),
                         state: DashboardState::default(),
+                    };
+                    if let Forest::Dashboard { config, .. } = self {
+                        return Command::perform(
+                            util::tickers(config.markets.clone()),
+                            Message::TickersReceived,
+                        );
+                    }
+                }
+            }
+            Message::TickersReceived(tickers) => {
+                if let Forest::Dashboard {
+                    balances, orders, ..
+                } = self
+                {
+                    // You know when they talk about "bad design"? Yeah, this is it.
+                    let balances = balances.clone();
+                    let orders = orders.clone();
+
+                    *self = Forest::Dashboard {
+                        balances,
+                        orders,
+                        state: DashboardState::default(),
+                        config: ForestConfig::default(),
+                        tickers: Some(tickers.unwrap()),
                     }
                 }
             }
@@ -150,7 +177,7 @@ impl Application for Forest {
     fn view(&mut self) -> Element<'_, Self::Message> {
         let content = match self {
             Forest::LoginScreen { .. } => self.welcome(),
-            Forest::DashboardLoading { .. } | Forest::DashboardLoaded { .. } => self.dashboard(),
+            Forest::DashboardLoading { .. } | Forest::Dashboard { .. } => self.dashboard(),
         };
 
         content.into()
@@ -297,10 +324,11 @@ impl Forest {
                     .center_y()
                     .style(config.theme());
             }
-            Forest::DashboardLoaded {
+            Forest::Dashboard {
                 config,
                 state,
                 balances,
+                tickers: _tickers,
                 orders,
             } => {
                 const FIRA_CODE: Font = Font::External {
@@ -308,39 +336,83 @@ impl Forest {
                     bytes: include_bytes!("../../assets/fonts/FiraCode-Regular.ttf"),
                 };
 
-                fn display_balance(
-                    currency: Currency,
-                    balances: &HashMap<String, f64>,
-                ) -> Row<Message> {
-                    fn get_icon_path(currency: &str) -> String {
-                        format!("assets/icons/{}.svg", currency)
-                    }
+                let section: fn() -> Column<'static, Message> =
+                    || Column::new().spacing(20).padding(20);
 
-                    let (icon_path, currency) = match currency {
-                        Currency::BTC => (get_icon_path("bitcoin"), "BTC"),
-                        Currency::XMR => (get_icon_path("monero"), "XMR"),
+                fn get_icon_path(currency: &Currency) -> String {
+                    let icon_name = match currency {
+                        Currency::BTC => "bitcoin",
+                        Currency::ETH => "ethereum",
+                        Currency::XMR => "monero",
                     };
 
-                    Row::new()
-                        .spacing(10)
-                        .push(
-                            Svg::from_path(icon_path)
-                                .width(Length::Units(28))
-                                .height(Length::Units(28)),
+                    format!("assets/icons/{}.svg", icon_name)
+                }
+
+                fn display_balance(
+                    currencies: Vec<Currency>,
+                    balances: &HashMap<String, f64>,
+                ) -> Column<'static, Message> {
+                    let mut balance_column = Column::new().spacing(10);
+                    let mut icons = Column::new().spacing(5).padding(5);
+                    let mut amounts = Column::new().spacing(15).padding(5);
+
+                    for currency in currencies {
+                        let icon_path = get_icon_path(&currency);
+
+                        icons = icons
+                            .push(
+                                Svg::from_path(icon_path)
+                                    .width(Length::Units(28))
+                                    .height(Length::Units(28)),
+                            )
+                            .align_items(Align::Center);
+
+                        amounts = amounts.push(
+                            Text::new(format!(
+                                "{}",
+                                balances.get(currency.to_string().as_str()).unwrap_or(&0.0)
+                            ))
+                            .font(FIRA_CODE),
                         )
-                        .push(
-                            Text::new(format!("{}: {}", currency, balances.get(currency).unwrap()))
-                                .horizontal_alignment(HorizontalAlignment::Left)
-                                .font(FIRA_CODE),
-                        )
+                    }
+
+                    let row = Row::new().push(icons).push(amounts);
+
+                    balance_column = balance_column.push(row);
+
+                    balance_column
+                }
+
+                fn display_markets(markets: &[Currency]) -> Column<'static, Message> {
+                    let mut tickers = Column::new().spacing(10);
+                    let mut icons = Column::new().spacing(5).padding(5);
+                    let mut prices = Column::new().spacing(15).padding(5);
+
+                    for currency in markets {
+                        icons = icons
+                            .push(
+                                Svg::from_path(get_icon_path(currency))
+                                    .width(Length::Units(28))
+                                    .height(Length::Units(28)),
+                            )
+                            .align_items(Align::Center);
+
+                        prices = prices.push(Text::new("3.14159265 BTC").font(FIRA_CODE));
+                    }
+
+                    let row1 = Row::new().push(icons).push(prices);
+
+                    tickers = tickers.push(row1);
+
+                    tickers
                 }
 
                 fn display_orders(
                     mut order_history: Vec<OrderHistory>,
                 ) -> Column<'static, Message> {
-                    fn display_order(order: OrderHistory) -> Row<'static, Message> {
-                        Row::new().spacing(10).push(Text::new(order.market))
-                    }
+                    let display_order: fn(OrderHistory) -> Row<'static, Message> =
+                        |order| Row::new().spacing(10).push(Text::new(order.market));
 
                     let mut history = Column::new().spacing(10);
 
@@ -360,24 +432,32 @@ impl Forest {
                     .on_press(Message::ButtonPressed(ForestButton::Back))
                     .style(config.theme());
 
-                let balances = Column::new()
-                    .spacing(20)
-                    .padding(20)
+                let balances = section()
                     .max_width(300)
                     .push(section_title("Balances"))
                     .push(Rule::horizontal(38).style(config.theme()))
-                    .push(display_balance(Currency::BTC, balances.get_all()))
-                    .push(display_balance(Currency::XMR, balances.get_all()));
+                    .push(display_balance(
+                        vec![Currency::XMR, Currency::BTC],
+                        balances.get_all(),
+                    ));
 
-                let active_orders = Column::new()
-                    .spacing(20)
-                    .padding(20)
+                let markets = section()
+                    .max_width(600)
+                    .push(section_title("Markets"))
+                    .push(Rule::horizontal(38).style(config.theme()))
+                    .push(display_markets(&config.markets));
+
+                let active_orders = section()
                     .max_width(300)
                     .push(section_title("Orders"))
                     .push(Rule::horizontal(38).style(config.theme()))
                     .push(display_orders(orders.clone()));
 
-                let row_one = Row::new().push(balances).push(active_orders);
+                let row_one = Row::new()
+                    .push(balances)
+                    .push(markets)
+                    .push(active_orders)
+                    .max_height(900);
 
                 let content = Column::new()
                     .push(row_one)

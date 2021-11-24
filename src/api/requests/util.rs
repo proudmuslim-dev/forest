@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
-use std::{fmt, fmt::Formatter};
+use serde::{Deserialize, Serialize};
+use strum_macros::Display;
 
 lazy_static! {
     pub static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::new();
@@ -19,17 +20,12 @@ impl From<reqwest::Error> for Error {
 }
 
 // TODO: Complete list
-#[derive(Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Display, Debug, Copy, Clone)]
 pub enum Currency {
+    #[serde(rename = "USDT-BTC")]
     BTC,
+    #[serde(rename = "BTC-ETH")]
+    ETH,
+    #[serde(rename = "BTC-XMR")]
     XMR,
-}
-
-impl fmt::Display for Currency {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Currency::BTC => write!(f, "BTC"),
-            Currency::XMR => write!(f, "XMR"),
-        }
-    }
 }
