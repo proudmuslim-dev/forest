@@ -22,10 +22,13 @@ impl From<reqwest::Error> for Error {
 // TODO: Complete list
 #[derive(Serialize, Deserialize, Display, Debug, Copy, Clone)]
 pub enum Currency {
+    #[strum(serialize = "USDT-BTC")]
     #[serde(rename = "USDT-BTC")]
     BTC,
+    #[strum(serialize = "BTC-ETH")]
     #[serde(rename = "BTC-ETH")]
     ETH,
+    #[strum(serialize = "BTC-XMR")]
     #[serde(rename = "BTC-XMR")]
     XMR,
 }

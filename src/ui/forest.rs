@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use iced::{
     button, executor, text_input, Align, Application, Button, Clipboard, Column, Command,
     Container, Element, Font, HorizontalAlignment, Length, Radio, Row, Rule, Svg, Text, TextInput,
 };
 use iced_aw::{modal, Card, Modal};
-use std::collections::HashMap;
 
+use crate::ui::themes::style::Theme;
 use crate::{
     api::{
         model::private::{Balances, OrderHistory},
@@ -126,6 +128,7 @@ impl Application for Forest {
                 if let Forest::DashboardLoading { .. } = self {
                     let balances = balances.unwrap();
                     let orders = orders.unwrap();
+
                     *self = Forest::Dashboard {
                         balances,
                         orders,
@@ -133,6 +136,7 @@ impl Application for Forest {
                         config: ForestConfig::default(),
                         state: DashboardState::default(),
                     };
+
                     if let Forest::Dashboard { config, .. } = self {
                         return Command::perform(
                             util::tickers(config.markets.clone()),
@@ -242,7 +246,7 @@ impl Forest {
                 )
                 .push(Row::new().spacing(10).push(text_input).push(next_button));
 
-            let theme = config.theme();
+            let theme = config.theme(); // Necessary due to closure
 
             // TODO: Figure out why it's impossible to align this correctly
             let modal = Modal::new(&mut state.modal_state, content, move |modal_state| {
@@ -279,14 +283,14 @@ impl Forest {
     }
 
     fn dashboard(&mut self) -> Container<Message> {
-        fn section_title(title: &str) -> Row<Message> {
+        let section_title: fn(title: &str) -> Row<Message> = |title| {
             Row::new().push(
                 Text::new(title)
                     .width(Length::Fill)
                     .size(40)
                     .horizontal_alignment(HorizontalAlignment::Center),
             )
-        }
+        };
 
         match self {
             Forest::DashboardLoading { config, state } => {
@@ -338,6 +342,8 @@ impl Forest {
 
                 let section: fn() -> Column<'static, Message> =
                     || Column::new().spacing(20).padding(20);
+
+                let separator: fn(Theme) -> Rule = |theme| Rule::horizontal(38).style(theme);
 
                 fn get_icon_path(currency: &Currency) -> String {
                     let icon_name = match currency {
@@ -435,7 +441,7 @@ impl Forest {
                 let balances = section()
                     .max_width(300)
                     .push(section_title("Balances"))
-                    .push(Rule::horizontal(38).style(config.theme()))
+                    .push(separator(config.theme()))
                     .push(display_balance(
                         vec![Currency::XMR, Currency::BTC],
                         balances.get_all(),
@@ -444,13 +450,13 @@ impl Forest {
                 let markets = section()
                     .max_width(600)
                     .push(section_title("Markets"))
-                    .push(Rule::horizontal(38).style(config.theme()))
+                    .push(separator(config.theme()))
                     .push(display_markets(&config.markets));
 
                 let active_orders = section()
                     .max_width(300)
                     .push(section_title("Orders"))
-                    .push(Rule::horizontal(38).style(config.theme()))
+                    .push(separator(config.theme()))
                     .push(display_orders(orders.clone()));
 
                 let row_one = Row::new()
