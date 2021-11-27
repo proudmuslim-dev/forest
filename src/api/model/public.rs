@@ -26,14 +26,14 @@ pub struct Market {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct Ticker {
     success: bool,
     #[serde(rename = "initialprice")]
     #[serde_as(as = "DisplayFromStr")]
     initial_price: f64,
     #[serde_as(as = "DisplayFromStr")]
-    price: f64,
+    pub(crate) price: f64,
     #[serde_as(as = "DisplayFromStr")]
     high: f64,
     #[serde_as(as = "DisplayFromStr")]

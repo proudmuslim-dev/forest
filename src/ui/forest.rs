@@ -99,6 +99,7 @@ impl Application for Forest {
                             config: ForestConfig::default(),
                             state: DashboardLoadingState::default(),
                         };
+
                         if let Forest::DashboardLoading { config, .. } = self {
                             return Command::perform(
                                 util::load_dashboard(config.api_key()),
@@ -332,7 +333,7 @@ impl Forest {
                 config,
                 state,
                 balances,
-                tickers: _tickers,
+                tickers,
                 orders,
             } => {
                 const FIRA_CODE: Font = Font::External {
@@ -390,12 +391,17 @@ impl Forest {
                     balance_column
                 }
 
-                fn display_markets(markets: &[Currency]) -> Column<'static, Message> {
-                    let mut tickers = Column::new().spacing(10);
+                fn display_markets(
+                    markets: &[Currency],
+                    tickers: Vec<Ticker>,
+                ) -> Column<'static, Message> {
+                    let mut markets_column = Column::new().spacing(10);
                     let mut icons = Column::new().spacing(5).padding(5);
                     let mut prices = Column::new().spacing(15).padding(5);
 
-                    for currency in markets {
+                    let mut currency_display_price;
+
+                    for (x, currency) in markets.iter().enumerate() {
                         icons = icons
                             .push(
                                 Svg::from_path(get_icon_path(currency))
@@ -404,14 +410,26 @@ impl Forest {
                             )
                             .align_items(Align::Center);
 
-                        prices = prices.push(Text::new("3.14159265 BTC").font(FIRA_CODE));
+                        if let Currency::BTC = currency {
+                            currency_display_price = format!(
+                                "{} USD",
+                                tickers.get(x as usize).unwrap_or(&Ticker::default()).price // Should really just have it display a 0 manually instead of creating a new `Ticker` instance, however I'm tired and really do not care
+                            );
+                        } else {
+                            currency_display_price = format!(
+                                "{} BTC",
+                                tickers.get(x as usize).unwrap_or(&Ticker::default()).price
+                            );
+                        }
+
+                        prices = prices.push(Text::new(currency_display_price).font(FIRA_CODE));
                     }
 
                     let row1 = Row::new().push(icons).push(prices);
 
-                    tickers = tickers.push(row1);
+                    markets_column = markets_column.push(row1);
 
-                    tickers
+                    markets_column
                 }
 
                 fn display_orders(
@@ -451,7 +469,10 @@ impl Forest {
                     .max_width(600)
                     .push(section_title("Markets"))
                     .push(separator(config.theme()))
-                    .push(display_markets(&config.markets));
+                    .push(display_markets(
+                        &config.markets,
+                        tickers.as_ref().unwrap_or(&vec![]).clone(),
+                    ));
 
                 let active_orders = section()
                     .max_width(300)
