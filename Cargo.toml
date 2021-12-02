@@ -5,7 +5,7 @@ authors = ["Proudmuslim <proudmuslim-dev@protonmail.com>"]
 description = """
 Custom frontend for the tradeogre.com exchange, written using Iced.
 """
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 ## UI
