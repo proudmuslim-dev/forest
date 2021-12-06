@@ -6,7 +6,6 @@ use iced::{
 };
 use iced_aw::{modal, Card, Modal};
 
-use crate::ui::themes::style::Theme;
 use crate::{
     api::{
         model::private::{Balances, OrderHistory},
@@ -151,7 +150,6 @@ impl Application for Forest {
                     balances, orders, ..
                 } = self
                 {
-                    // You know when they talk about "bad design"? Yeah, this is it.
                     let balances = balances.clone();
                     let orders = orders.clone();
 
@@ -341,10 +339,10 @@ impl Forest {
                     bytes: include_bytes!("../../assets/fonts/FiraCode-Regular.ttf"),
                 };
 
+                let separator = || Rule::horizontal(38).style(config.theme());
+
                 let section: fn() -> Column<'static, Message> =
                     || Column::new().spacing(20).padding(20);
-
-                let separator: fn(Theme) -> Rule = |theme| Rule::horizontal(38).style(theme);
 
                 fn get_icon_path(currency: &Currency) -> String {
                     let icon_name = match currency {
@@ -459,7 +457,7 @@ impl Forest {
                 let balances = section()
                     .max_width(300)
                     .push(section_title("Balances"))
-                    .push(separator(config.theme()))
+                    .push(separator())
                     .push(display_balance(
                         vec![Currency::XMR, Currency::BTC],
                         balances.get_all(),
@@ -468,7 +466,7 @@ impl Forest {
                 let markets = section()
                     .max_width(600)
                     .push(section_title("Markets"))
-                    .push(separator(config.theme()))
+                    .push(separator())
                     .push(display_markets(
                         &config.markets,
                         tickers.as_ref().unwrap_or(&vec![]).clone(),
@@ -477,7 +475,7 @@ impl Forest {
                 let active_orders = section()
                     .max_width(300)
                     .push(section_title("Orders"))
-                    .push(separator(config.theme()))
+                    .push(separator())
                     .push(display_orders(orders.clone()));
 
                 let row_one = Row::new()
